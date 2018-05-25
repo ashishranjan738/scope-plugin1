@@ -19,6 +19,11 @@ dependencies:
 
 test:
   override:
+    - cd $SRCDIR/iops/vendor/golang.org/x
+    - rm -rf test net
+    - git clone https://github.com/golang/net
+    - git clone https://github.com/golang/text
+    - cd
     - cd $SRCDIR/iops  && make .iops.uptodate && docker tag weaveworksplugins/scope-iops pradeepkumar95/iops:$(./tools/image-tag):
         parallel: false
         timeout: 300
