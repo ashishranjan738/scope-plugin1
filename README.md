@@ -1,1 +1,2 @@
-# scope-plugin1
+# scope-plugin
+openebs plugin for weave scope
