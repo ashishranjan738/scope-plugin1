@@ -24,7 +24,8 @@ test:
     - git clone https://github.com/golang/net
     - git clone https://github.com/golang/text
     - cd
-    - cd $SRCDIR/iops  && make .iops.uptodate && docker tag weaveworksplugins/scope-iops pradeepkumar95/iops:$(./tools/image-tag):
+    - cd $SRCDIR/iops  && make .iops.uptodate && docker tag weaveworksplugins/scope-iops pradeepkumar95/iops:$(./tools/image-tag)
+    - docker tag weaveworksplugins/scope-iops pradeepkumar95/iops:latest
 
 deployment:
   stag:
