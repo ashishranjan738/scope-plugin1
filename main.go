@@ -20,16 +20,16 @@ var url string
 var clientset *kubernetes.Clientset
 var readch = make(chan map[string]float64)
 var writech = make(chan map[string]float64)
-var read1ch = make(chan map[string]float64)
-var write1ch = make(chan map[string]float64)
-var read2ch = make(chan map[string]float64)
-var write2ch = make(chan map[string]float64)
+var readLatencych = make(chan map[string]float64)
+var writeLatencych = make(chan map[string]float64)
+var readThroughputch = make(chan map[string]float64)
+var writeThroughputch = make(chan map[string]float64)
 
 // Plugin groups the methods a plugin needs
 type Plugin struct {
-	pvs  map[string]pvdata
-	pvs1 map[string]pvdata1
-	pvs2 map[string]pvdata2
+	pvs     map[string]pvdata
+	Latpvs  map[string]pvLatdata
+	Tputpvs map[string]pvTputdata
 }
 
 type request struct {
@@ -100,7 +100,6 @@ type Iops struct {
 
 // main function
 func main() {
-	println("hhh")
 	// creates the in-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -131,10 +130,10 @@ func main() {
 
 	//readch = make(chan map[string]float64)
 	//writech = make(chan map[string]float64)
-	// read1ch = make(chan map[string]float64)
-	// write1ch = make(chan map[string]float64)
-	// read2ch = make(chan map[string]float64)
-	// write2ch = make(chan map[string]float64)
+	// readLatencych = make(chan map[string]float64)
+	// writeLatencych = make(chan map[string]float64)
+	// readThroughputch = make(chan map[string]float64)
+	// writeThroughputch = make(chan map[string]float64)
 
 	defer func() {
 		listener.Close()
@@ -177,9 +176,9 @@ func setupSignals(socketPath string) {
 // NewPlugin instantiates a new plugin
 func NewPlugin() (*Plugin, error) {
 	plugin := &Plugin{
-		pvs:  getPVs(),
-		pvs1: getPVs1(),
-		pvs2: getPVs2(),
+		pvs:     getPVs(),
+		Latpvs:  getLatPVs(),
+		Tputpvs: getTputPVs(),
 	}
 	return plugin, nil
 }
@@ -193,38 +192,38 @@ func getValue(body []byte) (*Iops, error) {
 	return storeBefore, err
 }
 
-func getValue1(body []byte) (*Iops, error) {
-	storeBefore1 := new(Iops)
-	err := json.Unmarshal(body, &storeBefore1)
+func getLatValue(body []byte) (*Iops, error) {
+	s1 := new(Iops)
+	err := json.Unmarshal(body, &s1)
 	if err != nil {
 		fmt.Println("whoops:")
 	}
-	return storeBefore1, err
+	return s1, err
 }
 
-func getValue2(body []byte) (*Iops, error) {
-	storeBefore2 := new(Iops)
-	err := json.Unmarshal(body, &storeBefore2)
+func getTputValue(body []byte) (*Iops, error) {
+	s2 := new(Iops)
+	err := json.Unmarshal(body, &s2)
 	if err != nil {
 		fmt.Println("whoops:")
 	}
-	return storeBefore2, err
+	return s2, err
 }
 
 func (p *Plugin) makeReport() (*report, error) {
 	go p.updatePVs()
-	go p.updatePVs1()
-	go p.updatePVs2()
+	go p.updateLatPVs()
+	go p.updateTputPVs()
 	metrics := make(map[string][]float64)
 	resource := make(map[string]node)
 	for k, v := range p.pvs {
 		metrics[p.getTopologyPv(k)] = append(metrics[p.getTopologyPv(k)], v.read, v.write)
 	}
-	for x, y := range p.pvs1 {
-		metrics[p.getTopologyPv1(x)] = append(metrics[p.getTopologyPv1(x)], y.read1, y.write1)
+	for x, y := range p.Latpvs {
+		metrics[p.getTopologyPv1(x)] = append(metrics[p.getTopologyPv1(x)], y.readLatency, y.writeLatency)
 	}
-	for c, d := range p.pvs2 {
-		metrics[p.getTopologyPv2(c)] = append(metrics[p.getTopologyPv2(c)], d.read2, d.write2)
+	for c, d := range p.Tputpvs {
+		metrics[p.getTopologyPv2(c)] = append(metrics[p.getTopologyPv2(c)], d.readThroughput, d.writeThroughput)
 	}
 	for a, _ := range metrics {
 		resource[a] = node{
@@ -260,7 +259,7 @@ func (p *Plugin) metrics(data []float64) map[string]metric {
 				},
 			},
 			Min: 0,
-			Max: 34,
+			Max: 20,
 		},
 		"w": {
 			Samples: []sample{
@@ -270,7 +269,7 @@ func (p *Plugin) metrics(data []float64) map[string]metric {
 				},
 			},
 			Min: 0,
-			Max: 30,
+			Max: 20,
 		},
 		"r1": {
 			Samples: []sample{
@@ -280,7 +279,7 @@ func (p *Plugin) metrics(data []float64) map[string]metric {
 				},
 			},
 			Min: 0,
-			Max: 22,
+			Max: 20,
 		},
 		"w1": {
 			Samples: []sample{
@@ -300,7 +299,7 @@ func (p *Plugin) metrics(data []float64) map[string]metric {
 				},
 			},
 			Min: 0,
-			Max: 22,
+			Max: 20,
 		},
 		"w2": {
 			Samples: []sample{
@@ -320,38 +319,38 @@ func (p *Plugin) metricTemplates() map[string]metricTemplate {
 	return map[string]metricTemplate{
 		"r": {
 			ID:       "r",
-			Label:    "Read",
-			Format:   "",
+			Label:    "R-Iops",
+			Format:   "seconds",
 			Priority: 0.1,
 		},
 		"w": {
 			ID:       "w",
-			Label:    "Write",
-			Format:   "percent",
+			Label:    "W-Iops",
+			Format:   "seconds",
 			Priority: 0.2,
 		},
 		"r1": {
 			ID:       "r1",
-			Label:    "Read Latency",
+			Label:    "R-Latency",
 			Format:   "millisecond",
 			Priority: 0.3,
 		},
 		"w1": {
 			ID:       "w1",
-			Label:    "Write Latency",
+			Label:    "W-Latency",
 			Format:   "millisecond",
 			Priority: 0.4,
 		},
 		"r2": {
 			ID:       "r2",
-			Label:    "Read T-put",
-			Format:   "filesize",
+			Label:    "R-Tput",
+			Format:   "bytes",
 			Priority: 0.5,
 		},
 		"w2": {
 			ID:       "w2",
-			Label:    "Write T-put",
-			Format:   "filesize",
+			Label:    "W-Tput",
+			Format:   "bytes",
 			Priority: 0.6,
 		},
 	}

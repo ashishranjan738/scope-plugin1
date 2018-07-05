@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http/httptest"
-	"reflect"
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
@@ -27,6 +26,15 @@ func TestGetValues(t *testing.T) {
 			queryType: "OpenEBS_read_iops",
 			channel:   "read",
 		},
+		"When getting data for OpenEBS_write_iops:": {
+			fakeHandler: utiltesting.FakeHandler{
+				StatusCode:   200,
+				ResponseBody: string(respone),
+				T:            t,
+			},
+			queryType: "OpenEBS_write_iops",
+			channel:   "write",
+		},
 	}
 
 	for name, tt := range cases {
@@ -36,29 +44,11 @@ func TestGetValues(t *testing.T) {
 			if tt.channel == "read" {
 				read := <-readch
 				t.Logf("%v", read)
-				//t.Errorf("%#v", read)
 			} else if tt.channel == "write" {
 				write := <-writech
 				t.Logf("%v", write)
-				//t.Errorf("%#v", write)
 			}
 
-		})
-	}
-}
-
-func Test_getPVs(t *testing.T) {
-	tests := []struct {
-		name string
-		want map[string]pvdata
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getPVs(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getPVs() = %v, want %v", got, tt.want)
-			}
 		})
 	}
 }
