@@ -28,7 +28,6 @@ func getValues(urlpassed string, query string) {
 	if err != nil {
 		panic(err.Error())
 	}
-
 	s, err := getValue([]byte(body))
 	if err != nil {
 		panic(err.Error())

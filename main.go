@@ -225,7 +225,7 @@ func (p *Plugin) makeReport() (*report, error) {
 	for c, d := range p.Tputpvs {
 		metrics[p.getTopologyPv2(c)] = append(metrics[p.getTopologyPv2(c)], d.readThroughput, d.writeThroughput)
 	}
-	for a, _ := range metrics {
+	for a := range metrics {
 		resource[a] = node{
 			Metrics: p.metrics(metrics[a]),
 		}
